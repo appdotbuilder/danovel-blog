@@ -1,15 +1,42 @@
+import { db } from '../db';
+import { blogPostsTable } from '../db/schema';
 import { type GetBlogPostsInput, type BlogPost } from '../schema';
+import { eq, desc, and, type SQL } from 'drizzle-orm';
 
-export async function getBlogPosts(input: GetBlogPostsInput): Promise<BlogPost[]> {
-  // This is a placeholder declaration! Real code should be implemented here.
-  // The goal of this handler is fetching blog posts from the database with optional filtering
-  // and pagination support.
-  
-  // Future implementation should:
-  // 1. Apply filters for published status and author if provided
-  // 2. Apply pagination using limit and offset
-  // 3. Order by created_at descending (newest first)
-  // 4. Return the filtered and paginated list of blog posts
-  
-  return Promise.resolve([]);
-}
+export const getBlogPosts = async (input: GetBlogPostsInput): Promise<BlogPost[]> => {
+  try {
+    // Build conditions array for filtering
+    const conditions: SQL<unknown>[] = [];
+
+    // Filter by published status if provided
+    if (input.published !== undefined) {
+      conditions.push(eq(blogPostsTable.published, input.published));
+    }
+
+    // Filter by author if provided
+    if (input.author) {
+      conditions.push(eq(blogPostsTable.author, input.author));
+    }
+
+    // Build and execute query directly without reassignment
+    const results = conditions.length > 0
+      ? await db.select()
+          .from(blogPostsTable)
+          .where(conditions.length === 1 ? conditions[0] : and(...conditions))
+          .orderBy(desc(blogPostsTable.created_at))
+          .limit(input.limit)
+          .offset(input.offset)
+          .execute()
+      : await db.select()
+          .from(blogPostsTable)
+          .orderBy(desc(blogPostsTable.created_at))
+          .limit(input.limit)
+          .offset(input.offset)
+          .execute();
+
+    return results;
+  } catch (error) {
+    console.error('Blog posts retrieval failed:', error);
+    throw error;
+  }
+};
